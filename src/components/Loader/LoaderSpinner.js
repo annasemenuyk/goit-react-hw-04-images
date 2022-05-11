@@ -1,5 +1,6 @@
 import { ThreeDots } from 'react-loader-spinner';
 import styles from './LoaderSpinner.module.css';
+
 const LoaderSpinner = () => {
   return (
     <ThreeDots

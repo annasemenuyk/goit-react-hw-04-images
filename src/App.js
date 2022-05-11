@@ -1,7 +1,8 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { animateScroll as scroll } from 'react-scroll';
 
 import fetchImagesApi from './services/pixabay';
 import Container from './components/Container';
@@ -18,92 +19,78 @@ const Status = {
   REJECTED: 'rejected',
 };
 
-class App extends Component {
-  state = {
-    searchQuery: '',
-    page: 1,
-    imagesArray: [],
-    showModal: false,
-    imagesModal: {},
-    status: Status.IDLE,
-    error: null,
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-    const { searchQuery, page } = this.state;
-    const prevSearchQuery = prevState.searchQuery;
-    const prevPage = prevState.page;
-
-    if (prevSearchQuery !== searchQuery || prevPage !== page) {
-      this.setState({ status: Status.PENDING });
-
-      fetchImagesApi(searchQuery, page)
-        .then(images => {
-          if (images.hits.length === 0) {
-            toast.error('Requested images not found!');
-            this.resetPage();
-          }
-
-          this.setState(prevState =>
-            page > 1
-              ? {
-                  imagesArray: [...prevState.imagesArray, ...images.hits],
-                  status: Status.RESOLVED,
-                }
-              : { imagesArray: images.hits, status: Status.RESOLVED }
-          );
-        })
-        .catch(error => {
-          this.setState({ error, status: Status.REJECTED });
-          toast.error('Requested images not found!');
-        });
+const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [imagesArray, setImagesArray] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [imagesModal, setImagesModal] = useState({});
+  const [status, setStatus] = useState(Status.IDLE);
+  useEffect(() => {
+    if (searchQuery === '') {
+      return;
     }
-  }
 
-  handleFormSubmit = searchQuery => {
-    this.resetPage();
-    this.setState({ searchQuery });
+    setStatus(Status.PENDING);
+
+    fetchImagesApi(searchQuery, page)
+      .then(images => {
+        if (images.hits.length === 0) {
+          toast.error('Requested images not found!');
+          resetPage();
+        } else if (images.hits.length < 12) {
+          setImagesArray(images.hits);
+          setStatus(Status.RESOLVED);
+        } else if (images.hits.length >= 12 && page >= 1) {
+          setImagesArray(prevState => [...prevState, ...images.hits]);
+          setStatus(Status.RESOLVED);
+          scroll.scrollMore(100);
+        }
+      })
+      .catch(error => {
+        toast.error('Requested images not found!');
+        setStatus(Status.REJECTED);
+      });
+  }, [searchQuery, page]);
+  const handleFormSubmit = searchQuery => {
+    resetPage();
+    setSearchQuery(searchQuery);
   };
 
-  resetPage = () => {
-    this.setState({ page: 1 });
+  const resetPage = () => {
+    setPage(1);
+    setImagesArray([]);
   };
 
-  handleLoadMoreBtn = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const handleLoadMoreBtn = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  toggleModal = imagesArray => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-      imagesModal: imagesArray,
-    }));
+  const toggleModal = imagesArray => {
+    setShowModal(!showModal);
+    setImagesModal(imagesArray);
   };
 
-  render() {
-    const { imagesArray, status, showModal, imagesModal } = this.state;
-    return (
-      <Container>
-        <Searchbar onSubmit={this.handleFormSubmit} />
+  return (
+    <Container>
+      <Searchbar onSubmit={handleFormSubmit} />
 
-        <ImageGallery images={imagesArray} onOpenModal={this.toggleModal} />
+      <ImageGallery images={imagesArray} onOpenModal={toggleModal} />
 
-        {status === 'pending' && <LoaderSpinner />}
+      {status === 'pending' && <LoaderSpinner />}
 
-        {imagesArray.length >= 12 && (
-          <Button onClickLoadMore={this.handleLoadMoreBtn} />
-        )}
+      {imagesArray.length >= 12 && (
+        <Button onClickLoadMore={handleLoadMoreBtn} />
+      )}
 
-        {showModal && (
-          <Modal onCloseModal={this.toggleModal}>
-            <img src={imagesModal.largeImageURL} alt={imagesModal.tags} />
-          </Modal>
-        )}
-
-        <ToastContainer autoClose={1500} />
-      </Container>
-    );
-  }
-}
+      {showModal && (
+        <Modal onCloseModal={toggleModal}>
+          <img src={imagesModal.largeImageURL} alt={imagesModal.tags} />
+        </Modal>
+      )}
+      <ToastContainer autoClose={1500} />
+    </Container>
+  );
+};
 
 export default App;
